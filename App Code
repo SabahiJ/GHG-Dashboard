@@ -1,0 +1,97 @@
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+import numpy as np
+import seaborn as sns
+
+#######################
+# Page configuration
+st.set_page_config(
+    page_title="Dashboard for Air Pollutants Analysis",
+    layout="wide",
+    initial_sidebar_state="expanded")
+
+st.header("Welcome to the simplified data analysis app")
+
+########################
+# Function to load data with caching and allow selection
+@st.cache_data
+def load_data(filename):
+    # Properly handling the file path
+    data_path = os.path.join(r"C:\Users\Student\OneDrive - University of Westminster\Downloads", filename)
+    try:
+        data = pd.read_csv(data_path)
+        return data
+    except FileNotFoundError:
+        st.error(f"File {filename} not found. Please check the file path.")
+        return pd.DataFrame()  # Return an empty DataFrame
+
+# Sidebar for selecting the data file
+file_options = {
+    "Emissions-of-air-pollutants-oecd": "Nikhil emissions-of-air-pollutants-oecd.csv",
+    "Ozone concentration": "Zahra- ozone-o3-concentration-in-ppb.csv",
+    "Death rate from air pollution": "Derell- death-rate-from-air-pollution-per-100000.csv",
+    "Emissions of particulate matter": "Luke -emissions-of-particulate-matter.csv",
+    "Sulphur oxide emissions": "Luke -sulphur-oxide-emissions -.csv",
+    "Methane emissions": "Sabahi- methane-emissions (1).csv"
+}
+
+selected_file = st.sidebar.selectbox("Select a dataset to display", list(file_options.keys()))
+
+# Load selected data
+df = load_data(file_options[selected_file])
+
+if not df.empty:
+    st.write("Data Overview:")
+    st.write(df.describe())  # Statistical summary of numeric columns
+
+    # Function to create a heatmap of the correlation matrix
+    def create_heatmap(data):
+        numeric_df = data.select_dtypes(include=[np.number])
+        if not numeric_df.empty:
+            corr = numeric_df.corr()
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(corr, annot=True, cmap='coolwarm', cbar=True)
+            plt.title('Correlation Matrix Heatmap')
+            st.pyplot(plt)
+        else:
+            st.error("No numeric data available for correlation.")
+
+    # Automatically show heatmap if there are numeric columns
+    create_heatmap(df)
+
+# Optionally, add raw data viewing
+if st.checkbox("Show Raw Data", False):
+    st.subheader("Raw Data")
+    st.dataframe(df)
+
+# Check if there is a numeric column for filtering with a slider
+numeric_columns = df.select_dtypes(include=['float', 'int']).columns
+if len(numeric_columns) > 0:
+    selected_numeric_column = st.sidebar.selectbox("Select a Numeric Column to Filter", numeric_columns)
+    min_value = float(df[selected_numeric_column].min())
+    max_value = float(df[selected_numeric_column].max())
+    # Slider for selecting a range of values
+    values = st.sidebar.slider("Select Range", min_value, max_value, (min_value, max_value))
+    filtered_data = df[(df[selected_numeric_column] >= values[0]) & (df[selected_numeric_column] <= values[1])]
+else:
+    filtered_data = df  # No numeric column found, no filtering
+    ####################################
+
+# Function to create a scatter plot
+def scatter_plot(data, x_col, y_col):
+    fig, ax = plt.subplots()
+    ax.scatter(data[x_col], data[y_col], color='blue', alpha=0.5)
+    ax.set_xlabel(x_col)
+    ax.set_ylabel(y_col)
+    ax.set_title(f'Scatter Plot: {x_col} vs. {y_col}')
+    return fig
+
+# Select column for scatter plot
+if st.sidebar.checkbox("Show Scatter Plot", False):
+    selected_x = st.sidebar.selectbox("Select X Axis Data", df.columns)
+    selected_y = st.sidebar.selectbox("Select Y Axis Data", df.columns)
+    if st.button("Generate Scatter Plot"):
+        fig = scatter_plot(filtered_data, selected_x, selected_y)
+        st.pyplot(fig)
